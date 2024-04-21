@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Multiplayer Rook Move Game</title>
+<style>
+    .chessboard {
+        width: 400px;
+        height: 400px;
+        display: grid;
+        grid-template-columns: repeat(8, 1fr);
+        grid-template-rows: repeat(8, 1fr);
+    }
+
+    .cell {
+        width: 50px;
+        height: 50px;
+        background-color: #eee;
+        border: 1px solid #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .rook {
+        width: 40px;
+        height: 40px;
+        animation: movePlayer 0.5s infinite alternate;
+    }
+
+    @keyframes movePlayer {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(-5px); }
+    }
+
+    .barrier {
+        background-color: brown;
+    }
+
+    .selected {
+        background-color: yellow;
+    }
+
+    .pointer {
+        background-color: lightblue;
+    }
+
+    /* Styles for timing/loading animation */
+    #loadingIcon {
+        display: none;
+        width: 40px;
+        height: 40px;
+        animation: rotate 1s linear infinite;
+    }
+
+    @keyframes rotate {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+</head>
+<body>
+
+<div class="chessboard" id="chessboard">
+    <!-- Chessboard cells will be added dynamically using JavaScript -->
+</div>
+
+<div>
+    <button id="startSetup">Start Setup</button>
+    <button id="startGame" style="display: none;">Start Game</button>
+    <button id="giveUp" style="display: none;">Give Up</button>
+    <span id="timer"></span>
+    <img id="loadingIcon" src="loading.gif" alt="Loading...">
+</div>
+
+<script>
+    let currentPlayer = 1;
+    let stage = 1;
+    let rookPosition = 0;
+    let timer;
+    const timeLimit = 30; // Time limit for each player's turn in seconds
+    let setupMode = false;
+
+    // Define barriers for each stage
+    const barriers = {
+        1: [16, 23],
+        2: [40, 43, 44, 45, 46, 47],
+        // Add more stages and barriers as needed
+    };
+
+    // Create 8x8 chessboard
+    const chessboard = document.getElementById('chessboard');
+
+    // Function to initialize chessboard
+    function initializeChessboard() {
+        chessboard.innerHTML = ''; // Clear chessboard
+        for (let i = 0; i < 64; i++) {
+            const cell = document.createElement('div');
+            cell.classList.add('cell');
+            if (barriers[stage] && barriers[stage].includes(i)) {
+                cell.classList.add('barrier');
+            }
+            chessboard.appendChild(cell);
+        }
+    }
+
+    initializeChessboard();
+
+    // Function to move the rook left and down
+    function moveRook(left, down) {
+        const newPosition = rookPosition + left + 8 * down;
+        if (newPosition >= 0 && newPosition < 64 && !isBarrier(newPosition)) {
+            chessboard.children[rookPosition].innerHTML = '';
+            const img = document.createElement('img');
+            img.src = 'rook.png'; // Set the image URL here
+            img.classList.add('rook');
+            chessboard.children[newPosition].appendChild(img);
+            rookPosition = newPosition;
+        } else {
+            alert('Invalid move. Rook can\'t move there.');
+        }
+    }
+
+    // Function to check if the rook reached the bottom left corner
+    function checkWin() {
+        if (rookPosition === 56) {
+            clearInterval(timer);
+            alert(`Player ${currentPlayer} wins Stage ${stage}!`);
+            stage++;
+            if (stage > Object.keys(barriers).length) {
+                alert("Congratulations! You've completed all stages.");
+                return true;
+            }
+            initializeChessboard(); // Reset chessboard for new stage
+            rookPosition = 0;
+            currentPlayer = 1;
+            startSetup();
+            return true;
+        }
+        return false;
+    }
+
+    // Function to check if a cell is a barrier
+    function isBarrier(position) {
+        return barriers[stage] && barriers[stage].includes(position);
+    }
+
+    // Function to switch players
+    function switchPlayer() {
+        currentPlayer = currentPlayer === 1 ? 2 : 1;
+        clearInterval(timer);
+        startTimer();
+    }
+
+    // Function to start the timer for current player
+    function startTimer() {
+        let timeLeft = timeLimit;
+        timer = setInterval(() => {
+            document.getElementById('timer').innerText = `Player ${currentPlayer}'s turn: ${timeLeft}s left`;
+            timeLeft--;
+            if (timeLeft < 0) {
+                clearInterval(timer);
+                alert(`Player ${currentPlayer}'s time is up!`);
+                if (currentPlayer === 1 && !setupMode) {
+                    clearInterval(timer);
+                    alert("Player 1 didn't move. Game restarts for Player 2.");
+                    startSetup();
+                } else {
+                    switchPlayer();
+                }
+            }
+        }, 1000);
+    }
+
+    // Function to start the setup phase
+    function startSetup() {
+        document.getElementById('startSetup').disabled = true;
+        setupMode = true;
+        document.getElementById('startGame').style.display = 'inline';
+        document.getElementById('timer').innerText = `Player ${currentPlayer}, set your initial position.`;
+        chessboard.children[0].classList.add('selected');
+        chessboard.children[0].classList.add('pointer');
+    }
+
+    // Function to handle when a player gives up
+    function giveUp() {
+        clearInterval(timer);
+        alert(`Player ${currentPlayer} has given up. Player ${currentPlayer === 1 ? 2 : 1} wins!`);
+        initializeChessboard();
+        rookPosition = 0;
+        currentPlayer = currentPlayer === 1 ? 2 : 1; // Switch player
+        startSetup();
+    }
+
+    // Event listener for start setup button
+    document.getElementById('startSetup').addEventListener('click', startSetup);
+
+    // Event listener for start game button
+    document.getElementById('startGame').addEventListener('click', function() {
+        stage = 1; // Reset stage to 1
+        initializeChessboard(); // Reset chessboard for new stage
+        document.getElementById('startGame').disabled = true;
+        setupMode = false;
+        document.getElementById('timer').innerText = '';
+        document.getElementById('giveUp').style.display = 'inline'; // Show Give Up button
+        startTimer();
+    });
+
+    // Event listener for give up button
+    document.getElementById('giveUp').addEventListener('click', giveUp);
+
+    // Event listener for keyboard input
+    document.addEventListener('keydown', function(event) {
+        if (setupMode) {
+            if (event.key === 'ArrowLeft') {
+                moveRook(-1, 0); // Move left
+            } else if (event.key === 'ArrowRight') {
+                moveRook(1, 0); // Move right
+            } else if (event.key === 'ArrowUp') {
+                moveRook(0, -1); // Move up
+            } else if (event.key === 'ArrowDown') {
+                moveRook(0, 1); // Move down
+            }
+            chessboard.children[rookPosition].classList.add('selected');
+            chessboard.children[rookPosition].classList.add('pointer');
+        } else {
+            if (!checkWin()) {
+                let validMove = false;
+                if (event.key === 'ArrowLeft') {
+                    moveRook(-1, 0); // Move left
+                    validMove = true;
+                } else if (event.key === 'ArrowDown') {
+                    moveRook(0, 1); // Move down
+                    validMove = true;
+                }
+                if (!validMove) {
+                    clearInterval(timer);
+                    alert(`No valid moves left for Player ${currentPlayer}. Game over for Player ${currentPlayer}!`);
+                } else {
+                    switchPlayer();
+                }
+            }
+        }
+    });
+
+    // Event listener for Enter key press during setup
+    document.addEventListener('keydown', function(event) {
+        if (setupMode && event.key === 'Enter') {
+            document.getElementById('startGame').click();
+        }
+    });
+</script>
+
+</body>
+</html>
